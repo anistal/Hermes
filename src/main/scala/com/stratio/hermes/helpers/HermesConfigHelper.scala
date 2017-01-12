@@ -17,13 +17,11 @@
 package com.stratio.hermes.helpers
 
 import com.stratio.hermes.helpers.HermesConfigHelper._
-import com.typesafe.config.{ConfigFactory, Config}
+import com.typesafe.config.Config
 
 import scala.util.Try
 
-case class HermesConfigHelper(configContent: String, template: String) {
-
-  val config = ConfigFactory.parseString(configContent)
+case class HermesConfigHelper(template: String)(implicit config:Config) {
 
   def assertConfig(): Unit = {
     def buildErrors(mandatoryFields: Seq[String]): Seq[String] =
@@ -37,7 +35,7 @@ case class HermesConfigHelper(configContent: String, template: String) {
   }
 
   def configType(): ConfigType.Value =
-    if(config.getString("kafka.key.serializer") == "io.confluent.kafka.serializers.KafkaAvroSerializer") {
+    if(config.getString("kafkaProducer.key.serializer") == "io.confluent.kafka.serializers.KafkaAvroSerializer") {
       ConfigType.Avro
     } else {
       ConfigType.Json
@@ -56,8 +54,6 @@ case class HermesConfigHelper(configContent: String, template: String) {
   def hermesI18n: String = config.getString("hermes.i18n")
 
   def avroSchema: String = config.getString(config.getString("hermes.avro-schema"))
-
-  def kafkaConfig: Config = config.atKey("kakfa")
 }
 
 
@@ -66,13 +62,11 @@ object HermesConfigHelper {
   val MandatoryFields = Seq(
     "hermes.topic-name",
     "hermes.template-name",
-    "hermes.i18n",
-    "kafka.key.serializer"
+    "hermes.i18n"
   )
 
   val AvroMandatoryFields = Seq(
-    "hermes.avro-schema",
-    "kafka.schema.registry.url"
+    "hermes.avro-schema"
   )
 
   object ConfigType extends Enumeration {

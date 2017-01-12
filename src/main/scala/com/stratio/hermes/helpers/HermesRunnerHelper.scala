@@ -33,51 +33,6 @@ import scala.concurrent.ExecutionContextExecutor
  */
 object HermesRunnerHelper extends HermesLogging {
 
-//  val ConfigContent =
-//    """
-//      |hermes {
-//      |  topic-name = "chustas"
-//      |  template-name = "chustasTemplate"
-//      |  i18n = "ES"
-//      |}
-//      |kafka {
-//      |  bootstrap.servers = "localhost:9092"
-//      |  acks = "-1"
-//      |  //retries = "0"
-//      |  //batch.size = "16384"
-//      |  //linger.ms = "1"
-//      |  //buffer.memory = "33554432"
-//      |  key.serializer = "org.apache.kafka.common.serialization.StringSerializer"
-//      |  value.serializer = "org.apache.kafka.common.serialization.StringSerializer"
-//      |}
-//    """.stripMargin
-
-  val templateContent =
-    """
-      |@import com.stratio.hermes.utils.Hermes
-      |@import com.stratio.hermes.utils.Positive
-      |@import java.util.UUID
-      |
-      |@(hermes: Hermes)
-      |{
-      |  "id" : "@(UUID.randomUUID().toString)"
-      |  //"id" : "a"
-      |  //"customerId": @(hermes.Number.number(1,Positive)),
-      |  //"customerName": "@(hermes.Name.fullName)",
-      |  //"latitude": @(hermes.Geo.geolocation.latitude),
-      |  //"longitude": @(hermes.Geo.geolocation.longitude),
-      |  //"productIds": [@((1 to 5).map(x => hermes.Number.number(1, Positive)).mkString(","))]
-      |}
-    """.stripMargin
-
-//  val templateContent =
-//    """
-//      |@(hermes: Hermes)
-//      |{"id":1}
-//    """.stripMargin
-
-
-
   /**
    * Prints a welcome message with some information about the system and creates necessary paths.
    * @param system
@@ -108,20 +63,18 @@ object HermesRunnerHelper extends HermesLogging {
   def workerSupervisor(implicit config: Config,
                        system: ActorSystem,
                        executionContext: ExecutionContextExecutor): ActorRef =
-    system.actorOf(Props(new HermesSupervisorActor), "hermes-supervisor")
+    system.actorOf(Props(new HermesSupervisorActor(config.getString("hermes.supervisor-id"))), "hermes-supervisor")
 
   def clientActor(hermesSupervisor: ActorRef)(implicit config: Config,
                                               system: ActorSystem,
                                               executionContext: ExecutionContextExecutor): Unit = {
     import scala.concurrent.duration._
 
-
     system.scheduler.scheduleOnce(HermesConstants.ConstantWorkerSupervisorTimeout seconds) {
-      hermesSupervisor ! Start(Seq("chustas"), ConfigContent, templateContent)
+//      hermesSupervisor ! Start(Seq(config.getString("hermes.supervisor-id")), templateContent)
+      val templateContent = scala.io.Source.fromFile(config.getString("hermes.template-file")).mkString
+      hermesSupervisor ! Start(Seq(config.getString("hermes.supervisor-id")), templateContent)
     }
 
-    system.scheduler.scheduleOnce(HermesConstants.ConstantWorkerSupervisorStop seconds) {
-      hermesSupervisor ! Stop
-    }
   }
 }

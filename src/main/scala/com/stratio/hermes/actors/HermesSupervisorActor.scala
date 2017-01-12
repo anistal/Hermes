@@ -16,8 +16,6 @@
 
 package com.stratio.hermes.actors
 
-import java.util.UUID
-
 import akka.actor.{Actor, ActorLogging, Props}
 import akka.cluster.Cluster
 import com.stratio.hermes.actors.HermesSupervisorActor.{Start, Status, Stop, WorkerStatus}
@@ -25,26 +23,31 @@ import com.stratio.hermes.helpers.{HermesConfigHelper, TwirlHelper}
 import com.stratio.hermes.kafka.KafkaClient
 import com.stratio.hermes.utils.Hermes
 import com.typesafe.config.Config
+import org.apache.avro.Schema.Parser
 import play.twirl.api.Txt
 import tech.allegro.schema.json2avro.converter.JsonAvroConverter
 
-class HermesSupervisorActor(implicit config: Config) extends Actor with ActorLogging {
+class HermesSupervisorActor(id: String)(implicit config: Config) extends Actor with ActorLogging {
 
   private lazy val workerExecutor = cluster.system.actorOf(Props(new HermesExecutorActor), "hermes-executor")
 
   val cluster = Cluster(context.system)
-  //val id = UUID.randomUUID.toString
-  val id = "chustas"
+
   var status = WorkerStatus.Stopped
 
   override def receive: Receive = {
-    case Start(ids, configContent, templateContent) =>
+    case Start(ids,  templateContent) =>
       execute(ids, () => {
         assertStopped
-        val hc1 = HermesConfigHelper(configContent, templateContent)
-        val hc2 = HermesConfigHelper(configContent, templateContent)
+        val hc1 = HermesConfigHelper(templateContent)
+//        val hc2 = HermesConfigHelper(templateContent)
+//        val hc3 = HermesConfigHelper(templateContent)
+//        val hc4 = HermesConfigHelper(templateContent)
         assertCorrectConfig(hc1)
         workerExecutor ! HermesExecutorActor.Start(hc1)
+//        workerExecutor ! HermesExecutorActor.Start(hc2)
+//        workerExecutor ! HermesExecutorActor.Start(hc3)
+//        workerExecutor ! HermesExecutorActor.Start(hc4)
         status = WorkerStatus.Started
       })
 
@@ -84,22 +87,15 @@ private class HermesExecutorActor(implicit config: Config) extends Actor with Ac
       val template = TwirlHelper.template[(Hermes) => Txt](hc.templateContent, hc.templateName)
       val hermes = Hermes(hc.hermesI18n)
 
-      log.info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> YA!!!!")
-
-
       def produce: Unit = {
-        //val static  = template.static(hermes)
-//        if (hc.isAvro) {
-//          val parser = new Parser().parse(hc.avroSchema)
-//          val record = converter.convertToGenericDataRecord(json.getBytes("UTF-8"), parser)
-//          kafkaClient.send(hc.topic, record)
-//        } else {
-//          kafkaClient.send(hc.topic, json)
-//        }
-        //kafkaClient.send(hc.topic, static.toString())
-
-        kafkaClient.send(hc.topic, s"${UUID.randomUUID().toString}")
-//        Thread.sleep(1000l)
+        val json = template.static(hermes).toString()
+        if (hc.isAvro) {
+          val parser = new Parser().parse(hc.avroSchema)
+          val record = converter.convertToGenericDataRecord(json.getBytes("UTF-8"), parser)
+          kafkaClient.send(hc.topic, record)
+        } else {
+          kafkaClient.send(hc.topic, json)
+        }
         produce
       }
       produce
@@ -108,7 +104,7 @@ private class HermesExecutorActor(implicit config: Config) extends Actor with Ac
 
 object HermesSupervisorActor {
 
-  case class Start(workerIds: Seq[String], configContent: String, template: String)
+  case class Start(workerIds: Seq[String], template: String)
 
   case class Stop(workerIds: Seq[String])
 
